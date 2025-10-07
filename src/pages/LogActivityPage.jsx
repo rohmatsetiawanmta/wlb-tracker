@@ -6,17 +6,36 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Loader } from "lucide-react";
 
+// Fungsi Helper untuk konversi HH:MM:SS ke Detik
+const hmsToSeconds = (hms) => {
+  // Memisahkan H:M:S dan mengkonversinya ke integer.
+  // Jika input hanya M:S atau S, ini akan tetap bekerja.
+  const parts = hms.split(":").map((p) => parseInt(p) || 0);
+
+  let seconds = 0;
+  if (parts.length === 3) {
+    // Format HH:MM:SS
+    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  } else if (parts.length === 2) {
+    // Format MM:SS (jika pengguna hanya memasukkan dua bagian)
+    seconds = parts[0] * 60 + parts[1];
+  } else if (parts.length === 1) {
+    // Format SS saja
+    seconds = parts[0];
+  }
+
+  return seconds;
+};
+
 const LogActivityPage = () => {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // State untuk menyimpan kategori yang diambil dari database
   const [categories, setCategories] = useState([]);
 
   const [form, setForm] = useState({
     category_id: "",
-    duration_minutes: "",
-    mood_rating: "5", // Default rating 5 (Netral)
+    duration_hms: "00:00:00", // <-- State baru untuk input HH:MM:SS
   });
 
   const navigate = useNavigate();
@@ -24,8 +43,8 @@ const LogActivityPage = () => {
   // Fungsi untuk mengambil kategori dari Supabase
   const fetchCategories = useCallback(async () => {
     const { data, error } = await supabase
-      .from("activity_categories")
-      .select("id, name")
+      .from("activity_domains") // Mengambil dari tabel Domain (Level 1)
+      .select("domain_id, name") // Alias ke id dan name untuk dropdown
       .order("name", { ascending: true });
 
     if (error) {
@@ -35,14 +54,12 @@ const LogActivityPage = () => {
     }
 
     setCategories(data);
-    // Atur category_id default ke yang pertama di daftar
     if (data.length > 0) {
       setForm((prev) => ({ ...prev, category_id: data[0].id }));
     }
   }, []);
 
   useEffect(() => {
-    // Memeriksa sesi saat komponen dimuat
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
       if (!initialSession) {
@@ -50,12 +67,10 @@ const LogActivityPage = () => {
         navigate("/login", { replace: true });
         return;
       }
-      // Ambil kategori setelah sesi dikonfirmasi
       fetchCategories();
       setLoading(false);
     });
 
-    // Listener untuk perubahan sesi (login/logout)
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
         setSession(newSession);
@@ -83,10 +98,12 @@ const LogActivityPage = () => {
     e.preventDefault();
     if (!session) return;
 
-    // Validasi sederhana
-    const duration = parseInt(form.duration_minutes);
-    if (isNaN(duration) || duration <= 0) {
-      toast.error("Durasi harus angka positif.");
+    // 1. KONVERSI DURASI HH:MM:SS KE DETIK
+    const duration_seconds = hmsToSeconds(form.duration_hms);
+
+    // 2. Validasi Durasi (total detik)
+    if (duration_seconds <= 0) {
+      toast.error("Durasi harus lebih besar dari 0 detik.");
       return;
     }
 
@@ -94,14 +111,13 @@ const LogActivityPage = () => {
 
     const payload = {
       user_id: session.user.id,
-      category_id: form.category_id,
-      duration_minutes: duration,
-      mood_rating: parseInt(form.mood_rating),
+      tag_id: form.category_id, // Menggunakan Domain ID sebagai Tag ID sementara
+      duration_seconds: duration_seconds, // <-- MENGGUNAKAN HASIL KONVERSI
+      // mood_rating dihapus dari payload
       logged_at: new Date().toISOString(),
     };
 
     try {
-      // Masukkan payload ke tabel activity_logs
       const { error } = await supabase.from("activity_logs").insert(payload);
 
       if (error) throw error;
@@ -111,7 +127,7 @@ const LogActivityPage = () => {
       // Reset durasi dan arahkan ke dashboard
       setForm((prev) => ({
         ...prev,
-        duration_minutes: "",
+        duration_hms: "00:00:00", // <-- RESET FORMAT HMS
       }));
       navigate("/dashboard");
     } catch (error) {
@@ -137,8 +153,8 @@ const LogActivityPage = () => {
           Kesalahan Konfigurasi
         </h2>
         <p className="text-gray-600">
-          Mohon isi tabel **`activity_categories`** di Supabase console terlebih
-          dahulu untuk dapat mencatat aktivitas.
+          Mohon isi tabel **`activity_domains`** di Supabase console terlebih
+          dahulu (atau cek RLS policy).{" "}
         </p>
       </div>
     );
@@ -155,7 +171,7 @@ const LogActivityPage = () => {
           {/* Kategori Aktivitas */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">
-              Kategori Aktivitas
+              Domain Aktivitas
             </label>
             <select
               name="category_id"
@@ -172,43 +188,25 @@ const LogActivityPage = () => {
             </select>
           </div>
 
-          {/* Durasi */}
+          {/* Durasi (HH:MM:SS) */}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">
-              Durasi (dalam Menit)
+              Durasi (HH:MM:SS)
             </label>
             <input
-              type="number"
-              name="duration_minutes"
-              value={form.duration_minutes}
+              type="text"
+              name="duration_hms" // <-- NAME FIELD BARU
+              value={form.duration_hms}
               onChange={handleChange}
-              className="w-full rounded-md border p-3 focus:border-blue-500 focus:outline-none"
-              placeholder="Contoh: 60 (untuk 1 jam)"
+              className="w-full rounded-md border p-3 font-mono text-lg focus:border-blue-500 focus:outline-none"
+              placeholder="Contoh: 01:30:00 (1 jam 30 menit)"
+              pattern="\d{2}:\d{2}:\d{2}"
+              title="Gunakan format HH:MM:SS, misalnya 01:30:00"
               required
             />
           </div>
 
-          {/* Rating Mood */}
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              Bagaimana perasaan Anda terhadap aktivitas ini? (1=Buruk, 10=Baik)
-            </label>
-            <input
-              type="range"
-              name="mood_rating"
-              min="1"
-              max="10"
-              step="1"
-              value={form.mood_rating}
-              onChange={handleChange}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg"
-            />
-            <div className="flex justify-between text-xs pt-2">
-              <span className="text-red-500 font-semibold">1 (Buruk)</span>
-              <span>{form.mood_rating}</span>
-              <span className="text-green-500 font-semibold">10 (Baik)</span>
-            </div>
-          </div>
+          {/* Rating Mood Dihapus */}
 
           <button
             type="submit"

@@ -6,11 +6,11 @@ import { supabase } from "./lib/supabaseClient.js";
 import Navbar from "./components/Navbar";
 import { Loader } from "lucide-react";
 
-// --- IMPORT Halaman WLB TRACKER BARU ---
 import LogActivityPage from "./pages/LogActivityPage.jsx";
-// Import yang akan digunakan kembali
 import MainPage from "./pages/MainPage";
 import LoginPage from "./pages/LoginPage.jsx";
+import AdminPage from "./pages/Admin/AdminPage.jsx";
+import ActivityCategoryManager from "./pages/admin/ActivityCategoryManager.jsx";
 
 // Komponen Pembatas Akses untuk Rute Admin
 const ProtectedRoute = ({ children, userRole, isLoading }) => {
@@ -117,8 +117,30 @@ function App() {
         <Route path="/" element={<MainPage />} />
         <Route path="/login" element={<LoginPage />} />
 
-        {/* --- RUTE INTI WLB TRACKER --- */}
+        {/* --- RUTE WLB TRACKER --- */}
+        {/* <Route path="/dashboard" element={<UserDashboardPage />} /> */}
         <Route path="/logs" element={<LogActivityPage />} />
+        {/* <Route path="/goals" element={<ComingSoon />} /> */}
+
+        {/* --- RUTE ADMIN (Dilindungi) --- */}
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute userRole={userRole} isLoading={isLoading}>
+              {/* Nested Routes untuk Admin */}
+              <Routes>
+                <Route path="/" element={<AdminPage />} />
+                {/* <Route path="users" element={<UserManagementPage />} /> */}
+                <Route
+                  path="categories"
+                  element={<ActivityCategoryManager />}
+                />
+                {/* <Route path="logs" element={<ComingSoon />} />{" "} */}
+                {/* <Route path="settings" element={<ComingSoon />} />{" "} */}
+              </Routes>
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </div>
   );
