@@ -3,9 +3,6 @@
 import React from "react";
 import DomainLogTable from "../../components/DomainLogTable";
 
-const HealthDashboardPage = () => {
-  // Komponen ini mengikat logika tampilan log dasar ke Domain 'health'.
-  return <DomainLogTable domainId="health" />;
-};
+const HealthDashboardPage = () => {};
 
 export default HealthDashboardPage;
