@@ -11,6 +11,8 @@ import MainPage from "./pages/MainPage";
 import LoginPage from "./pages/LoginPage.jsx";
 import AdminPage from "./pages/Admin/AdminPage.jsx";
 import ActivityCategoryManager from "./pages/admin/ActivityCategoryManager.jsx";
+import UserDashboardPage from "./pages/UserDashboardPage.jsx";
+import DomainDashboardPage from "./pages/DomainDashboardPage.jsx";
 
 // Komponen Pembatas Akses untuk Rute Admin
 const ProtectedRoute = ({ children, userRole, isLoading }) => {
@@ -118,7 +120,8 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
 
         {/* --- RUTE WLB TRACKER --- */}
-        {/* <Route path="/dashboard" element={<UserDashboardPage />} /> */}
+        <Route path="/dashboard" element={<UserDashboardPage />} />
+        <Route path="/dashboard/:domainId" element={<DomainDashboardPage />} />
         <Route path="/logs" element={<LogActivityPage />} />
         {/* <Route path="/goals" element={<ComingSoon />} /> */}
 
